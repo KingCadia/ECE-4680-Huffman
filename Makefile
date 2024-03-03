@@ -4,8 +4,8 @@ Bins = encode decode
 
 all	: $(Bins) 
 
-encode	:	encode.c 
-	$(comp) $(comp_flags) encode.c -o encode
+encode	:	encode.c huffmanEncode.c huffmanEncode.h
+	$(comp) $(comp_flags) encode.c huffmanEncode.c -o encode
 
 decode	:	decode.c 
 	$(comp) $(comp_flags) decode.c -o decode
