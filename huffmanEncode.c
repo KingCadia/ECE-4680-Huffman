@@ -1,24 +1,24 @@
 #include "huffmanEncode.h"
 int nodesDone;
 // private function defs
-node *makeNode(node *first, node *second, char byte, int frequnecy);
-void searchTree(node *curr, char code, int level, table *codes);
+node *makeNode(node *first, node *second, unsigned char byte, int frequnecy);
+void searchTree(node *curr, unsigned char code, int level, table *codes);
 
 // public functions
 
 // returns a linked this with the unsorted byte occurences
-node *initEncodeTree(FILE *file, int *fileSize, char **data, int *listSize)
+node *initEncodeTree(FILE *file, int *fileSize, unsigned char **data, int *listSize)
 {
     // finds the size of the file 
     int i;
-    char *holderData;
+    unsigned char *holderData;
     fseek(file, 0L, SEEK_END);
     *fileSize = ftell(file);
     // seeks back to the start of the file
     fseek(file, 0L, SEEK_SET);
-    holderData = (char *)malloc(sizeof(char) * *fileSize);
+    holderData = (unsigned char *)malloc(sizeof(unsigned char) * *fileSize);
     fread(holderData, sizeof(char), *fileSize, file);
-    char holder;
+    unsigned char holder;
     int table[256];
     for(i=0;i<256;i++)
     {
@@ -157,6 +157,74 @@ table *makeTable(int size, node *tree)
 
 }
 
+// function that takes the table and the data and encodes it to a output file
+void encodeData(FILE *file, unsigned char *data, int dataSize, table *codex, node *list)
+{
+    unsigned char writeData = 0;
+    unsigned char holder;
+    int i, j, shiftAmount;
+    node *seeker = list;
+    int bitsWritten = 0;
+
+    // writes the frequencies for each byte
+    short int sizes[256];
+    for(i=0;i<256;i++)
+    {
+        sizes[i] = 0;
+    }
+
+    while(seeker != NULL)
+    {
+        sizes[seeker->byte] = (short int)seeker->frequency;
+        seeker = seeker->next;
+    }
+    fwrite(&sizes, sizeof(short int), 256, file);
+
+    // writes the file data out to the file
+    for(i=0;i<dataSize;i++)
+    {
+        holder = data[i];
+        // finds holder in the codex
+        j = 0;
+        while(1)
+        {
+            if(codex[j].byte == holder)
+            {
+                break;
+            }
+            j++;
+        }
+
+        // finds out if the code can fit in the current write data
+        if((bitsWritten + codex[j].size) <= 8)
+        {
+            writeData = writeData | (codex[j].code << ((8 - bitsWritten) - codex[j].size));
+            bitsWritten = bitsWritten + codex[j].size;
+        }
+        else
+        {
+            // the code does not fit in the current byte
+            shiftAmount = codex[j].size - (8 - bitsWritten);
+            writeData = writeData | (codex[j].code >> shiftAmount);
+
+            // writes the data to the file
+            fwrite(&writeData, sizeof(unsigned char), 1, file);
+
+            // puts the remaining bytes in the new writedata
+            writeData = 0;
+            writeData = codex[j].code << ((8 - codex[j].size) + (codex[j].size - shiftAmount));
+            bitsWritten = shiftAmount;
+        }
+        if(bitsWritten == 8)
+        {
+            // writes the current writedata to the file
+            fwrite(&writeData, sizeof(unsigned char), 1, file);
+            writeData = 0;
+            bitsWritten = 0;
+        }
+    }  
+    fclose(file);
+}
 // private functions
 
 /*
@@ -164,7 +232,7 @@ functions to make new node that can be added to a list or a tree
 if first and last are both null the function will return an single byte not 
 else it will return a node with combined first and second
 */ 
-node *makeNode(node *first, node *second, char byte, int frequnecy)
+node *makeNode(node *first, node *second, unsigned char byte, int frequnecy)
 {
     node *newNode = (node *)malloc(sizeof(node));
     if(first == NULL && second == NULL)
@@ -189,7 +257,7 @@ node *makeNode(node *first, node *second, char byte, int frequnecy)
 /*
 recurrsive function that sets up makes the table and the codes for huffman encoding 
 */
-void searchTree(node *curr, char code, int level, table *codes)
+void searchTree(node *curr, unsigned char code, int level, table *codes)
 {
     // checks if the fuction needs to go deeper
     if(curr->left != NULL)

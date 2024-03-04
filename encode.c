@@ -6,12 +6,14 @@ int main(int argc, char **argv)
 {
     node *list;
     FILE *file = fopen(argv[1], "rb");
-    char *data;
+    unsigned char *data;
     int fileSize, listSize;
     list = initEncodeTree(file, &fileSize, &data, &listSize);
     sortList(list);
     node *tree = makeTree(list);
     table *codes = makeTable(listSize, tree);
+    file = fopen(argv[2], "wb");
+    encodeData(file, data, fileSize, codes, list);
     printTable(codes, listSize);
 }  
 
