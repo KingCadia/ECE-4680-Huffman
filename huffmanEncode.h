@@ -23,7 +23,8 @@ typedef struct table_t
 // function macros
 
 node *initEncodeTree(FILE *file, int *fileSize, unsigned char **data, int *listSize);
-void sortList(node *list);
+void sortList(node **list, int size);
 node *makeTree(node *list);
 table *makeTable(int size, node *tree);
 void encodeData(FILE *file, unsigned char *data, int dataSize, table *codex, node *list);
+node *initDecodeTree(FILE *file, int *fileSize, unsigned char **data, int *listSize);

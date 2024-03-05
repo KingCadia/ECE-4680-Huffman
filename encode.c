@@ -9,7 +9,7 @@ int main(int argc, char **argv)
     unsigned char *data;
     int fileSize, listSize;
     list = initEncodeTree(file, &fileSize, &data, &listSize);
-    sortList(list);
+    sortList(&list, listSize);
     node *tree = makeTree(list);
     table *codes = makeTable(listSize, tree);
     file = fopen(argv[2], "wb");

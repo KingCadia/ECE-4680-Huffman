@@ -66,35 +66,81 @@ node *initEncodeTree(FILE *file, int *fileSize, unsigned char **data, int *listS
     return head;
 }
 
-// function to sort the linked list from smallest to largest 
-void sortList(node *list)
+// returns a unsorted list off occurences from the decode side
+node *initDecodeTree(FILE *file, int *fileSize, unsigned char **data, int *listSize)
 {
-    int tempFre;
-    char tempByte;
+    unsigned short int frequenceies[256];
+    fread(&frequenceies, sizeof(unsigned short int), 256, file);
+    int holderFileSize = 0;
+    int holderListSize = 0;
+    *fileSize = 0; 
+    *listSize = 0; 
+    int i;
+    node *head = NULL;
+    node *seeker = NULL;
+    unsigned char *holderData;
+    int bytes;
 
-    node *seeker = list;
-    node *temp = NULL;
-    while(seeker != NULL)
+    fseek(file, 0L, SEEK_END);
+    bytes = ftell(file);
+    // seeks back to the start of the file
+    fseek(file, 0L, SEEK_SET);
+    bytes = bytes - (256 *2);
+    // makes the list
+    for(i=0;i<256;i++)
     {
-        temp = seeker;
-        while(temp->next != NULL)
+        if(frequenceies[i] > 0)
         {
-            if(temp->frequency < temp->next->frequency)
+            if(head == NULL)
             {
-                // swap the data
-                tempFre = temp->frequency;
-                tempByte = temp->byte;
+                head = makeNode(NULL, NULL, (unsigned char)i, frequenceies[i]);
+                seeker = head;
 
-                temp->frequency = temp->next->frequency;
-                temp->byte = temp->next->byte;
-
-                temp->next->frequency = tempFre;
-                temp->next->byte = tempByte;
             }
-            temp = temp->next;
+            else
+            {
+                seeker->next = makeNode(NULL, NULL, (unsigned char)i, frequenceies[i]);
+                seeker = seeker->next;
+            }
+            holderFileSize += frequenceies[i];
+            holderListSize++;
         }
-        seeker = seeker->next;
-    }   
+    }
+
+    holderData = (unsigned char *)malloc(sizeof(unsigned char) * bytes);
+    fread(holderData, sizeof(unsigned char), bytes, file);
+    *data = holderData;
+    *listSize = holderListSize;
+    *fileSize = holderFileSize;
+    return head;
+
+}
+
+// function to sort the linked list from smallest to largest 
+void sortList(node **list, int size)
+{
+    if (*list == NULL || (*list)->next == NULL)
+        return;
+
+    struct node *sorted = NULL;
+    struct node *current = *list;
+
+    while (current != NULL) {
+        struct node *next = current->next;
+        if (sorted == NULL || sorted->frequency >= current->frequency) {
+            current->next = sorted;
+            sorted = current;
+        } else {
+            struct node *temp = sorted;
+            while (temp->next != NULL && temp->next->frequency < current->frequency) {
+                temp = temp->next;
+            }
+            current->next = temp->next;
+            temp->next = current;
+        }
+        current = next;
+    }
+    *list = sorted;
 }
 
 // takes the sorted list and makes the huffman tree
@@ -183,6 +229,57 @@ void encodeData(FILE *file, unsigned char *data, int dataSize, table *codex, nod
     // writes the file data out to the file
     for(i=0;i<dataSize;i++)
     {
+        if(i == dataSize - 1)
+        {
+            // special case for the last entry
+            holder = data[i];
+            // finds holder in the codex
+            j = 0;
+            while(1)
+            {
+                if(codex[j].byte == holder)
+                {
+                    break;
+                }
+                j++;
+            }
+
+            // finds the bits that need to be written
+            if((bitsWritten + codex[j].size) <= 8)
+            {
+                writeData = writeData | (codex[j].code << ((8 - bitsWritten) - codex[j].size));
+                bitsWritten = bitsWritten + codex[j].size;
+            }
+
+             // finds out if the code can fit in the current write data
+            if((bitsWritten + codex[j].size) <= 8)
+            {
+                writeData = writeData | (codex[j].code << ((8 - bitsWritten) - codex[j].size));
+                bitsWritten = bitsWritten + codex[j].size;
+                fwrite(&writeData, sizeof(unsigned char), 1, file);
+                break;
+            }
+            else
+            {
+                // the code does not fit in the current byte
+                shiftAmount = codex[j].size - (8 - bitsWritten);
+                writeData = writeData | (codex[j].code >> shiftAmount);
+
+                // writes the data to the file
+                fwrite(&writeData, sizeof(unsigned char), 1, file);
+
+                // puts the remaining bytes in the new writedata
+                writeData = 0;
+                writeData = codex[j].code << ((8 - codex[j].size) + (codex[j].size - shiftAmount));
+                bitsWritten = shiftAmount;
+
+                // padds the last byte with extra bits
+                fwrite(&writeData, sizeof(unsigned char), 1, file);
+                break;
+            }
+
+        }
+
         holder = data[i];
         // finds holder in the codex
         j = 0;
@@ -281,3 +378,4 @@ void searchTree(node *curr, unsigned char code, int level, table *codes)
     }
     return;
 }
+
